@@ -21,15 +21,19 @@ source env/bin/activate
 env\Scripts\activate
 ```
 
-###3️⃣ Instalar las dependencias
+### 3️⃣ Instalar las dependencias
 
+```sh
 pip install -r requirements.txt
+```
 
-🏃 Ejecución del proyecto
+### 🏃 Ejecución del proyecto
 Dentro de la carpeta env, corre el siguiente comando en la terminal:
+```sh
 streamlit run app.py
+```
 
-📝 ¿Cómo funciona?
+### 📝 ¿Cómo funciona?
 Sube un archivo PDF desde la interfaz de Streamlit.
 La aplicación procesará el PDF y generará embeddings con FAISS.
 Puedes hacer preguntas sobre el contenido del PDF en la barra de entrada.
