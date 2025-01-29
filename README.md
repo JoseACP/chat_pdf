@@ -38,3 +38,7 @@ Sube un archivo PDF desde la interfaz de Streamlit.
 La aplicación procesará el PDF y generará embeddings con FAISS.
 Puedes hacer preguntas sobre el contenido del PDF en la barra de entrada.
 La respuesta se generará utilizando OpenAI GPT-4o.
+
+### ⚙️ Actualización 
+
+Se actualizo para que pueda procesar pdf, csv, xml, xlsx y xls
