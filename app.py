@@ -4,113 +4,133 @@ import pandas as pd
 import xml.etree.ElementTree as ET
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
-from streamlit_extras.add_vertical_space import add_vertical_space
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain.chains.question_answering import load_qa_chain
-from langchain.callbacks import get_openai_callback
-from langchain.vectorstores import FAISS
+from pdf2image import convert_from_path
+import pytesseract
+from PIL import Image
+import google.generativeai as genai
 
-# Sidebar
-with st.sidebar:
-    st.title('LLM Chat App')
-    st.markdown('''
-    ## About
-    This app is an LLM-powered chatbot built using:
-        - [Streamlit](https://streamlit.io/)
-        - [LangChain](https://python.langchain.com/)
-        - [OpenAI](https://platform.openai.com/docs/models) LLM model
-    ''')
-    add_vertical_space(5)
-    st.write('Made with by Ojabio Mesias')
 
-def process_pdf(file):
-    """ Extrae texto de un archivo PDF """
+# Cargar variables de entorno
+load_dotenv(override=True)
+
+# Configurar API de Gemini
+api_key = "AIzaSyChndM4r8mNh_tAHlsfXL4jVFx3pCdi5ws"
+genai.configure(api_key=api_key)
+
+# Configurar modelo de generación
+generation_config = {
+    "temperature": 1,
+    "top_p": 0.95,
+    "top_k": 40,
+    "max_output_tokens": 8182,
+    "response_mime_type": "text/plain"
+}
+
+model = genai.GenerativeModel(
+    model_name="gemini-1.5-flash",
+    generation_config=generation_config
+)
+
+# Función para extraer texto de un PDF normal
+def extract_text_from_pdf(file):
     pdf_reader = PdfReader(file)
-    text = ""
-    for page in pdf_reader.pages:
-        text += page.extract_text() or ""  # Evitar errores si es None
-    return text
+    text = "".join([page.extract_text() or "" for page in pdf_reader.pages])
+    return text.strip()
 
+# Función para extraer texto de un PDF escaneado (OCR)
+def pdf_to_text(pdf_path):
+    pages = convert_from_path(pdf_path, 300)
+    extracted_text = ""
+
+    for i, page in enumerate(pages):
+        image_path = f"temp_page_{i}.png"
+        page.save(image_path, "PNG")
+        text = pytesseract.image_to_string(image_path)
+        extracted_text += text + "\n\n"
+        os.remove(image_path)
+
+    return extracted_text.strip()
+
+# Función para procesar PDFs (normal o escaneado)
+def process_pdf(file):
+    text = extract_text_from_pdf(file)
+    if not text:
+        temp_path = f"temp_{file.name}"
+        with open(temp_path, "wb") as f:
+            f.write(file.getbuffer())
+        text = pdf_to_text(temp_path)
+        os.remove(temp_path)
+    return text.strip()
+
+# Función para procesar archivos CSV
 def process_csv(file):
-    """ Extrae texto de un archivo CSV """
     df = pd.read_csv(file)
-    return df.to_string(index=False)  # Convertir el CSV en texto legible
-
-def process_excel(file):
-    """ Extrae texto de un archivo Excel """
-    df = pd.read_excel(file)
     return df.to_string(index=False)
 
+# Función para procesar archivos Excel
+def process_excel(file):
+    df = pd.read_excel(file)
+    return df.to_string(index=False)
+# Función para procesar imágenes (JPG, PNG, TIFF)
+def process_image(file):
+    image = Image.open(file)
+    text = pytesseract.image_to_string(image)
+    return text.strip()
+
+# Función para procesar archivos XML
 def process_xml(file):
-    """ Extrae texto de un archivo XML """
     tree = ET.parse(file)
     root = tree.getroot()
     return ET.tostring(root, encoding='utf-8').decode('utf-8')
 
+# Función para enviar texto al modelo de Gemini
+def analyze_text_with_gemini(text, prompt):
+    response = model.generate_content([text, prompt])
+    return response.text
+
 def main():
-    st.header("Chat with Documents 📄📊")
+    st.header("📄📊 Chat con Documentos")
 
-    load_dotenv()
+    # Subida de archivo
+    uploaded_file = st.file_uploader("Sube tu documento", type=['pdf', 'csv', 'xlsx', 'xml', 'jpg', 'png', 'tiff', 'docx'])
 
-    # Subir un archivo (PDF, CSV, XML, Excel)
-    uploaded_file = st.file_uploader("Upload your document", type=['pdf', 'csv', 'xml', 'xlsx', 'xls'])
+    if "last_file" not in st.session_state:
+        st.session_state.last_file = None
+        st.session_state.doc_text = None
 
     if uploaded_file is not None:
-        st.write(f"📂 Archivo cargado: {uploaded_file.name}")
+        if uploaded_file.name != st.session_state.last_file:
+            # Procesar nuevo archivo
+            st.session_state.last_file = uploaded_file.name
+            file_extension = uploaded_file.name.split(".")[-1].lower()
 
-        # Procesar el archivo según su tipo
-        file_extension = uploaded_file.name.split('.')[-1].lower()
-        
-        if file_extension == 'pdf':
-            text = process_pdf(uploaded_file)
-        elif file_extension == 'csv':
-            text = process_csv(uploaded_file)
-        elif file_extension in ['xlsx', 'xls']:
-            text = process_excel(uploaded_file)
-        elif file_extension == 'xml':
-            text = process_xml(uploaded_file)
-        else:
-            st.error("❌ Formato de archivo no soportado.")
+
+#Cambiar esta seccion por switch se ve raro con tantos if
+            if file_extension == "pdf":
+                st.session_state.doc_text = process_pdf(uploaded_file)
+            elif file_extension == "csv":
+                st.session_state.doc_text = process_csv(uploaded_file)
+            elif file_extension in ["xls", "xlsx"]:
+                st.session_state.doc_text = process_excel(uploaded_file)
+            elif file_extension == "xml":
+                st.session_state.doc_text = process_xml(uploaded_file)
+            elif file_extension in ["jpg", "png", "tiff"]:
+                st.session_state.doc_text = process_image(uploaded_file)
+            else:
+                st.error("⚠️ Formato de archivo no compatible.")
+                return
+
+
+        if not st.session_state.doc_text:
+            st.error("⚠️ No se pudo extraer texto del documento.")
             return
 
-        # Verificar si hay contenido en el archivo
-        if not text.strip():
-            st.error("⚠️ El archivo está vacío o no se pudo extraer texto.")
-            return
+        st.write(f"📂 Documento cargado: {uploaded_file.name}")
 
-        # Dividir el texto en fragmentos para embeddings
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200,
-            length_function=len,
-        )
-        chunks = text_splitter.split_text(text=text)
-
-        # Crear embeddings
-        store_name = uploaded_file.name.rsplit('.', 1)[0]  # Quitar la extensión del archivo
-        embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-
-        if os.path.exists(f"{store_name}.faiss"):
-            VectorStore = FAISS.load_local(store_name, embeddings)
-            st.write('🔄 Embeddings cargados desde el disco')
-        else:
-            VectorStore = FAISS.from_texts(chunks, embedding=embeddings)
-            VectorStore.save_local(store_name)
-
-        # Input para preguntas
         query = st.text_input("Realiza una pregunta sobre tu documento")
 
         if query:
-            docs = VectorStore.similarity_search(query=query, k=3)
-
-            llm = ChatOpenAI(model="gpt-4o-mini")
-            chain = load_qa_chain(llm=llm, chain_type="stuff")
-
-            with get_openai_callback() as cb:
-                response = chain.run(input_documents=docs, question=query)
-                print(cb)
-
+            response = analyze_text_with_gemini(st.session_state.doc_text, query)
             st.write(response)
 
 if __name__ == '__main__':
