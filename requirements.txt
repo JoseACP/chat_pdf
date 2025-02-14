@@ -1,6 +1,11 @@
 streamlit
 python-dotenv
 PyPDF2
+pandas
+pdf2image
+pytesseract
+Pillow
+google-generativeai
 streamlit-extras
 langchain
 langchain-openai
