@@ -73,11 +73,6 @@ def process_csv(file):
 def process_excel(file):
     df = pd.read_excel(file)
     return df.to_string(index=False)
-# Función para procesar imágenes (JPG, PNG, TIFF)
-def process_image(file):
-    image = Image.open(file)
-    text = pytesseract.image_to_string(image)
-    return text.strip()
 
 # Función para procesar imágenes (JPG, PNG, TIFF)
 @st.cache_data
