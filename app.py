@@ -14,7 +14,7 @@ from io import BytesIO
 load_dotenv(override=True)
 
 # Configurar API de Gemini
-api_key = "AIzaSyChndM4r8mNh_tAHlsfXL4jVFx3pCdi5ws"
+api_key = "AIzaSyChndM4r8mNh_tAHlsfXL4jVFx3pCdi5ws"  # Reemplaza con tu API key
 genai.configure(api_key=api_key)
 
 # Configurar modelo de generación
@@ -22,8 +22,7 @@ generation_config = {
     "temperature": 1,
     "top_p": 0.95,
     "top_k": 40,
-    "max_output_tokens": 8182,
-    "response_mime_type": "text/plain"
+    "max_output_tokens": 8182,  # Este campo sí es válido
 }
 
 model = genai.GenerativeModel(
